@@ -21,3 +21,8 @@ db.sqlite3
 !doc/**/*.xls
 !doc/**/*.xlsx
 !doc/**/*.pdf
+
+doc/go-live-checklist.md
+doc/phase1-go-live-plan.md
+doc/phase2-hardening.md
+doc/phase3-enterprise-readiness.md
