@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Inrapporterade ärenden{% endblock %}
+
+{% block body %}
+    <div class="container mt-5">
+        <div class="card shadow-sm border-warning">
+            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">📥 Inrapporterade ärenden</h3>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'incident_report_create' %}" class="btn btn-sm btn-outline-dark">Nytt ärende</a>
+                    <a href="{% url 'incident_report_export_csv' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-primary">CSV</a>
+                    <a href="{% url 'incident_report_export_xlsx' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-success">Excel</a>
+                    <a href="{% url 'incident_report_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-secondary">PDF</a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="get" class="row g-2 align-items-end mb-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select form-select-sm">
+                            <option value="" {% if not filters.status %}selected{% endif %}>Alla</option>
+                            <option value="OPEN" {% if filters.status == "OPEN" %}selected{% endif %}>Öppen</option>
+                            <option value="IN_PROGRESS" {% if filters.status == "IN_PROGRESS" %}selected{% endif %}>Pågår</option>
+                            <option value="CLOSED" {% if filters.status == "CLOSED" %}selected{% endif %}>Stängd</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Från (YYYY-MM-DD)</label>
+                        <input name="from" value="{{ filters.from }}" class="form-control form-control-sm" placeholder="2026-03-01">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Till (YYYY-MM-DD)</label>
+                        <input name="to" value="{{ filters.to }}" class="form-control form-control-sm" placeholder="2026-03-31">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Badplats</label>
+                        <input name="beach" value="{{ filters.beach }}" class="form-control form-control-sm" placeholder="Sök badplats">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Sök</label>
+                        <input name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Rubrik/beskrivning">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Sortering</label>
+                        <select name="ordering" class="form-select form-select-sm">
+                            <option value="" {% if not filters.ordering %}selected{% endif %}>Standard</option>
+                            <option value="-created_at" {% if filters.ordering == "-created_at" %}selected{% endif %}>Nyast</option>
+                            <option value="created_at" {% if filters.ordering == "created_at" %}selected{% endif %}>Äldst</option>
+                            <option value="-updated_at" {% if filters.ordering == "-updated_at" %}selected{% endif %}>Senast uppdaterad</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="mine" value="1" id="mine" {% if filters.mine == "1" %}checked{% endif %}>
+                            <label class="form-check-label" for="mine">Mina (skapade)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="assigned" value="1" id="assigned" {% if filters.assigned == "1" %}checked{% endif %}>
+                            <label class="form-check-label" for="assigned">Tilldelade mig</label>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" type="submit">Filtrera</button>
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'incident_report_list' %}">Rensa</a>
+                    </div>
+                </form>
+
+                {% if reports %}
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Status</th>
+                                    <th>Tilldelad</th>
+                                    <th>Rubrik</th>
+                                    <th>Badplats</th>
+                                    <th>Skapad av</th>
+                                    <th>Skapad</th>
+                                    <th>Uppdaterad</th>
+                                    <th>Åtgärd</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in reports %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ report.id }}</span></td>
+                                        <td>
+                                            {% if report.status == "OPEN" %}
+                                                <span class="badge bg-danger">Öppen</span>
+                                            {% elif report.status == "IN_PROGRESS" %}
+                                                <span class="badge bg-warning text-dark">Pågår</span>
+                                            {% else %}
+                                                <span class="badge bg-success">Stängd</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if report.assigned_to %}{{ report.assigned_to.username }}{% else %}—{% endif %}</td>
+                                        <td>{{ report.title }}</td>
+                                        <td>{{ report.beach_name }}</td>
+                                        <td>{% if report.created_by %}{{ report.created_by.username }}{% else %}—{% endif %}</td>
+                                        <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ report.updated_at|date:"Y-m-d H:i" }}</td>
+                                        <td style="min-width: 360px;">
+                                            <form method="post" action="{% url 'incident_report_update_status' report.id %}">
+                                                {% csrf_token %}
+                                                <div class="row g-2">
+                                                    <div class="col-4">
+                                                        <select name="status" class="form-select form-select-sm">
+                                                            <option value="OPEN" {% if report.status == "OPEN" %}selected{% endif %}>Öppen</option>
+                                                            <option value="IN_PROGRESS" {% if report.status == "IN_PROGRESS" %}selected{% endif %}>Pågår</option>
+                                                            <option value="CLOSED" {% if report.status == "CLOSED" %}selected{% endif %}>Stängd</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-5">
+                                                        <select name="assigned_to" class="form-select form-select-sm">
+                                                            <option value="" {% if not report.assigned_to %}selected{% endif %}>Ej tilldelad</option>
+                                                            {% for u in users %}
+                                                                <option value="{{ u.id }}" {% if report.assigned_to and report.assigned_to.id == u.id %}selected{% endif %}>
+                                                                    {{ u.username }}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary w-100">Spara</button>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <textarea name="close_comment" class="form-control form-control-sm" rows="2" placeholder="Åtgärd/beslut (krävs vid Stängd)"></textarea>
+                                                    </div>
+                                                    <div class="col-12 d-flex justify-content-between">
+                                                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#audit-{{ report.id }}">
+                                                            Historik
+                                                        </button>
+                                                        {% if report.closed_at %}
+                                                            <span class="text-muted small">Stängd: {{ report.closed_at|date:"Y-m-d H:i" }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <tr class="collapse" id="audit-{{ report.id }}">
+                                        <td colspan="9" class="bg-light">
+                                            <div class="p-2">
+                                                <strong>Åtgärdslogg</strong>
+                                                {% if report.audit_logs.all|length %}
+                                                    <ul class="mb-0">
+                                                        {% for log in report.audit_logs.all|slice:":5" %}
+                                                            <li class="small">
+                                                                {{ log.created_at|date:"Y-m-d H:i" }} –
+                                                                {% if log.actor %}{{ log.actor.username }}{% else %}—{% endif %}
+                                                                – {{ log.get_action_display }}
+                                                                {% if log.from_status and log.to_status %} ({{ log.get_from_status_display }} → {{ log.get_to_status_display }}){% endif %}
+                                                                {% if log.from_assigned_to_id or log.to_assigned_to_id %}
+                                                                    (tilldelning ändrad)
+                                                                {% endif %}
+                                                                {% if log.comment %} – {{ log.comment }}{% endif %}
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                {% else %}
+                                                    <div class="text-muted small">Ingen historik ännu.</div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info mb-0">
+                        Inga ärenden har rapporterats ännu.
+                    </div>
+                {% endif %}
+
+                <div class="mt-3">
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Tillbaka till Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

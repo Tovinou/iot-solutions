@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Manager Rapport{% endblock %}
+
+{% block body %}
+    <div class="container mt-5">
+        <div class="card shadow-sm border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h3 class="mb-0">📋 Manager Rapport</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <strong>✅ Behörighet bekräftad:</strong> Du ser denna sida eftersom du tillhör gruppen <span class="badge bg-warning text-dark">Manager</span>.
+                </div>
+                <p class="lead">Välkommen till den exklusiva rapporten för beslutsfattare.</p>
+                <hr>
+                <h5>Veckans Nyckeltal:</h5>
+                <div class="row text-center mb-4">
+                    <div class="col-md-4">
+                        <div class="p-3 bg-light border rounded">
+                            <h3>16.5°C</h3>
+                            <small class="text-muted">Snitt Temperatur</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-light border rounded">
+                            <h3>2</h3>
+                            <small class="text-danger">Avvikelser</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-light border rounded">
+                            <h3 class="text-success">95%</h3>
+                            <small class="text-muted">Sensorhälsa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info mt-4">
+                    Detta är en skyddad vy som endast användare i gruppen "Manager" (eller Admin) kan se.
+                </div>
+                <a href="{% url 'incident_report_list' %}" class="btn btn-outline-dark me-2">Visa ärenden</a>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Tillbaka till Dashboard</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

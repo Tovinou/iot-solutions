@@ -1,0 +1,47 @@
+image:
+  repository: smart-env-monitor-web
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  path: /
+
+env:
+  DEBUG: "False"
+  ALLOWED_HOSTS: "localhost,127.0.0.1"
+  CSRF_TRUSTED_ORIGINS: ""
+  SECURE_SSL_REDIRECT: "False"
+  DB_CONN_MAX_AGE: "60"
+  THROTTLE_SENSOR_INGEST: "120/min"
+  THROTTLE_SENSOR_READ: "600/min"
+  SENSOR_STALE_MINUTES: "30"
+  SENSOR_HEALTH_CHECK_INTERVAL_SECONDS: "300"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+  DATABASE_URL: "postgresql://smartenv:smartenv@postgres:5432/smart_env_monitor"
+
+secrets:
+  SECRET_KEY: "change-me"
+  DEVICE_API_KEY: ""
+  POSTGRES_PASSWORD: "smartenv"
+
+postgres:
+  image: postgres:16-alpine
+  db: smart_env_monitor
+  user: smartenv
+  storage: 5Gi
+
+redis:
+  image: redis:7-alpine
+
+replicaCount:
+  web: 1
+  celeryWorker: 1
+  celeryBeat: 1

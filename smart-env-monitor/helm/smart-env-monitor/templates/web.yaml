@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "smart-env-monitor.fullname" . }}-web
+  labels:
+    {{- include "smart-env-monitor.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount.web }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "smart-env-monitor.name" . }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "smart-env-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "smart-env-monitor.fullname" . }}-config
+            - secretRef:
+                name: {{ include "smart-env-monitor.fullname" . }}-secret
+          ports:
+            - name: http
+              containerPort: 8000
+          command: ["sh", "-c"]
+          args:
+            - "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn backend.wsgi:application --bind 0.0.0.0:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "smart-env-monitor.fullname" . }}-web
+  labels:
+    {{- include "smart-env-monitor.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "smart-env-monitor.name" . }}
+    app.kubernetes.io/component: web
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http

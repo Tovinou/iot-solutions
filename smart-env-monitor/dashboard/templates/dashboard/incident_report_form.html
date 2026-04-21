@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Rapportera ärende{% endblock %}
+
+{% block body %}
+    <div class="container mt-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">📝 Rapportera ärende</h3>
+            </div>
+            <div class="card-body">
+                {% if submitted %}
+                    <div class="alert alert-success">
+                        <strong>✅ Ärendet är registrerat.</strong>
+                        {% if report %} ID: <span class="badge bg-success">{{ report.id }}</span>{% endif %}
+                    </div>
+                {% endif %}
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.title.id_for_label }}">Rubrik</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}<div class="text-danger small mt-1">{{ form.title.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.beach_name.id_for_label }}">Badplats</label>
+                        {{ form.beach_name }}
+                        {% if form.beach_name.errors %}<div class="text-danger small mt-1">{{ form.beach_name.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.description.id_for_label }}">Beskrivning</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Skicka in</button>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Tillbaka</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

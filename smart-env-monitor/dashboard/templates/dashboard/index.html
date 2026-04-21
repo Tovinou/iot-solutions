@@ -1,0 +1,538 @@
+{% extends "base.html" %}
+{% load auth_extras %}
+
+{% block title %}Badvattenovervakning{% endblock %}
+
+{% block extra_head %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+{% endblock %}
+
+{% block body %}
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="#">🌊 Smart Env Monitor</a>
+            <div class="d-flex align-items-center">
+                {% if user.is_authenticated %}
+                    <span class="navbar-text me-3">
+                        Inloggad som: <strong>{{ user.username }}</strong>
+                    </span>
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Logga ut</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-sm btn-primary">Logga in</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if user.is_authenticated %}
+            <div class="card mb-4 border-info shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">👋 Välkommen {{ user.username }}!</h5>
+                    <div>
+                        {% if user.is_superuser %} <span class="badge bg-danger">Super Admin</span> {% endif %}
+                        {% if user|has_group:"Manager" %} <span class="badge bg-warning text-dark">Manager</span> {% endif %}
+                        {% if user|has_group:"Analyst" %} <span class="badge bg-primary">Analyst</span> {% endif %}
+                        {% if user|has_group:"Viewer" %} <span class="badge bg-secondary">Viewer</span> {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="lead mb-4">Du har tillgång till följande verktyg baserat på din roll:</p>
+                    <div class="row g-3">
+                        {% if user|has_group:"Admin" %}
+                            <div class="col-md-3">
+                                <div class="card h-100 border-danger">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-danger">🛠️ Admin</h6>
+                                        <p class="small">Systemkonfiguration och användarhantering.</p>
+                                        <a href="/admin/" class="btn btn-sm btn-outline-danger w-100" target="_blank">Öppna Adminpanel</a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        {% if user|has_group:"Manager" %}
+                            <div class="col-md-3">
+                                <div class="card h-100 border-warning">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-warning">📋 Manager</h6>
+                                        <p class="small">Rapporter och beslutsunderlag.</p>
+                                        <div class="d-grid gap-2">
+                                            <a href="{% url 'manager_report' %}" class="btn btn-sm btn-outline-warning w-100">Exportera Rapport</a>
+                                            <a href="{% url 'incident_report_list' %}" class="btn btn-sm btn-outline-dark w-100">Visa ärenden</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        {% if user|has_group:"Analyst" %}
+                            <div class="col-md-3">
+                                <div class="card h-100 border-primary">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-primary">📊 Analyst</h6>
+                                        <p class="small">Djupgående dataanalys och trender.</p>
+                                        <a href="{% url 'analyst_tool' %}" class="btn btn-sm btn-outline-primary w-100">Starta Analysverktyg</a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        {% if user|has_group:"Viewer" %}
+                            <div class="col-md-3">
+                                <div class="card h-100 border-secondary">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-secondary">👀 Viewer</h6>
+                                        <p class="small">Endast visning av dashboard.</p>
+                                        <button class="btn btn-sm btn-outline-secondary w-100" disabled>Läsläge aktivt</button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <div class="col-md-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body text-center">
+                                    <h6 class="text-success">📝 Rapportera</h6>
+                                    <p class="small">Skapa ett ärende kopplat till badvatten/sensorer.</p>
+                                    <a href="{% url 'incident_report_create' %}" class="btn btn-sm btn-outline-success w-100">Rapportera ärende</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-warning shadow-sm">
+                <strong>Notis:</strong> Du kan se dashboarden utan inloggning. <a href="{% url 'login' %}">Logga in</a> om du vill rapportera ärenden och använda rollbaserade vyer.
+            </div>
+        {% endif %}
+
+        <h1 class="mb-4">Badvattenkvalitet - Dashboard</h1>
+
+        <!-- Senaste mätvärde -->
+        <div class="card mb-4">
+            <div class="card-header">
+                Aktuellt värde
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div id="latest-temp" class="display-4">–</div>
+                        <div class="text-muted">Temperatur (°C)</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div id="latest-turbidity" class="display-4">–</div>
+                        <div class="text-muted">Grumlighet (NTU)</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div id="latest-wave" class="display-4">–</div>
+                        <div class="text-muted">Våghöjd (m)</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div id="latest-battery" class="display-4">–</div>
+                        <div class="text-muted">Batteri (%)</div>
+                    </div>
+                </div>
+                <hr>
+                <div id="latest-status" class="text-center h3 mt-3"></div>
+                <div id="latest-time" class="text-center text-muted"></div>
+            </div>
+        </div>
+
+        <!-- Datumväljare -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label for="start-date" class="form-label">Från:</label>
+                <input type="datetime-local" id="start-date" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label for="end-date" class="form-label">Till:</label>
+                <input type="datetime-local" id="end-date" class="form-control">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button id="filter-btn" class="btn btn-primary me-2">Visa intervall</button>
+                <button id="reset-btn" class="btn btn-secondary">Live (24h)</button>
+            </div>
+        </div>
+
+        <!-- Historiskt diagram -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Historiska mätvärden (senaste 24h)
+                <div>
+                    <!-- <button id="export-png-btn" class="btn btn-sm btn-outline-secondary me-2">Exportera PNG</button> -->
+                    <!-- <button id="export-csv-btn" class="btn btn-sm btn-outline-secondary">Exportera CSV</button> -->
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="historyChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-body d-flex align-items-center justify-content-between">
+                <span>Sensorstatus</span>
+                <span class="badge text-bg-light border">{{ sensor_status|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if sensor_status %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Stale om ingen data inkommit på > {{ sensor_stale_minutes }} min.</div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0 table-dashboard">
+                            <thead>
+                                <tr>
+                                    <th>Sensor</th>
+                                    <th>Senast mottaget</th>
+                                    <th>Status</th>
+                                    <th>Ålder</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in sensor_status %}
+                                    <tr>
+                                        <td class="cell-nowrap">
+                                            <span class="badge text-bg-light border">{{ s.sensor_id }}</span>
+                                        </td>
+                                        <td class="cell-nowrap text-muted">
+                                            {% if s.last_seen %}
+                                                {{ s.last_seen|date:"Y-m-d H:i" }}
+                                            {% else %}
+                                                –
+                                            {% endif %}
+                                        </td>
+                                        <td class="cell-nowrap">
+                                            {% if s.is_stale %}
+                                                <span class="badge text-bg-danger">Stale</span>
+                                            {% else %}
+                                                <span class="badge text-bg-success">OK</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="cell-nowrap text-muted">
+                                            {% if s.age_minutes is not None %}
+                                                {{ s.age_minutes }} min
+                                            {% else %}
+                                                –
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info mb-0">Inga sensordata ännu.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header bg-body d-flex align-items-center justify-content-between">
+                        <span>Aktiva larmregler</span>
+                        <span class="badge text-bg-light border">{{ alert_rules|length }}</span>
+                    </div>
+                    <div class="card-body">
+                        {% if alert_rules %}
+                            <div class="table-scroll table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0 table-dashboard">
+                                    <thead>
+                                        <tr>
+                                            <th>Namn</th>
+                                            <th>Sensor</th>
+                                            <th>Villkor</th>
+                                            <th>Cooldown</th>
+                                            <th>Senast</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for r in alert_rules %}
+                                            <tr>
+                                                <td class="cell-truncate" title="{{ r.name }}">{{ r.name }}</td>
+                                                <td class="cell-nowrap">
+                                                    {% if r.sensor_id %}
+                                                        <span class="badge text-bg-light border">{{ r.sensor_id }}</span>
+                                                    {% else %}
+                                                        <span class="badge text-bg-secondary">Alla</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="cell-truncate" title="{{ r.metric_label }} {{ r.operator_label }} {{ r.threshold }}">
+                                                    <span class="badge text-bg-primary">{{ r.metric_label }}</span>
+                                                    <span class="badge text-bg-light border">{{ r.operator_label }}</span>
+                                                    <span class="badge text-bg-dark">{{ r.threshold }}</span>
+                                                </td>
+                                                <td class="cell-nowrap">
+                                                    <span class="badge text-bg-light border">{{ r.cooldown_minutes }} min</span>
+                                                </td>
+                                                <td class="cell-nowrap text-muted">
+                                                    {% if r.last_triggered_at %}
+                                                        {{ r.last_triggered_at|date:"Y-m-d H:i" }}
+                                                    {% else %}
+                                                        –
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">Inga aktiva larmregler är skapade ännu.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header bg-body d-flex align-items-center justify-content-between">
+                        <span>Senaste larmhändelser</span>
+                        <span class="badge text-bg-light border">{{ alert_events|length }}</span>
+                    </div>
+                    <div class="card-body">
+                        {% if alert_events %}
+                            <div class="table-scroll table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0 table-dashboard">
+                                    <thead>
+                                        <tr>
+                                            <th>Tid</th>
+                                            <th>Regel</th>
+                                            <th>Sensor</th>
+                                            <th>Värde</th>
+                                            <th>Mottagare</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for e in alert_events %}
+                                            <tr>
+                                                <td class="cell-nowrap text-muted">{{ e.triggered_at|date:"Y-m-d H:i" }}</td>
+                                                <td class="cell-truncate" title="{{ e.rule_name }}">{{ e.rule_name }}</td>
+                                                <td class="cell-truncate" title="{{ e.sensor_id }}">
+                                                    <span class="badge text-bg-light border">{{ e.sensor_id }}</span>
+                                                </td>
+                                                <td class="cell-truncate" title="{{ e.metric_label }} = {{ e.value }}">
+                                                    <span class="badge text-bg-primary">{{ e.metric_label }}</span>
+                                                    <span class="badge text-bg-dark">{{ e.value }}</span>
+                                                </td>
+                                                <td class="cell-truncate" title="{{ e.to_email }}">{{ e.to_email }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">Inga larmhändelser ännu.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+    <script>
+        let historyChart; // Håll en referens till diagrammet globalt
+        let isLiveMode = true; // Håll koll på om vi visar live-data eller historik
+        let currentSensorId = null;
+
+        function toApiDatetimeParam(date) {
+            return date.toISOString().replace('Z', '+00:00');
+        }
+
+        // Hämta senaste värdet
+        async function fetchLatest() {
+            try {
+                const response = await fetch('/api/v1/data/latest/');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentSensorId = data.sensor_id || null;
+                    
+                    // Uppdatera värden
+                    document.getElementById('latest-temp').innerText = data.water_temperature;
+                    document.getElementById('latest-turbidity').innerText = data.turbidity;
+                    document.getElementById('latest-wave').innerText = data.wave_height;
+                    document.getElementById('latest-battery').innerText = data.battery_life;
+                    
+                    const statusElem = document.getElementById('latest-status');
+                    // Använd Turbidity > 10 som logik för avvikelse (samma som simulatorn)
+                    const isDeviation = (data.turbidity > 10) || (data.quality === 'Avvikelse');
+                    
+                    statusElem.innerText = isDeviation ? '⚠️ Avvikelse' : '✅ OK';
+                    statusElem.className = isDeviation ? 'status-avvikelse text-center h3 mt-3' : 'status-ok text-center h3 mt-3';
+                    
+                    document.getElementById('latest-time').innerText = new Date(data.timestamp).toLocaleString('sv-SE');
+                }
+            } catch (error) {
+                console.error("Kunde inte hämta senaste värdet:", error);
+            }
+        }
+
+        // Hämta historik och uppdatera diagrammet
+        async function updateHistoryChart(customFrom = null, customTo = null) {
+            if (!currentSensorId) {
+                return;
+            }
+            let from, to;
+            
+            if (customFrom && customTo) {
+                from = toApiDatetimeParam(new Date(customFrom));
+                to = toApiDatetimeParam(new Date(customTo));
+            } else {
+                const now = new Date();
+                from = toApiDatetimeParam(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+                to = toApiDatetimeParam(now);
+            }
+
+            // Använd rätt API endpoint
+            const response = await fetch(`/api/v1/data/history/?sensor_id=${encodeURIComponent(currentSensorId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&page_size=1000`);
+
+            if (!response.ok) {
+                console.error("Kunde inte hämta historikdata.");
+                return;
+            }
+
+            const data = await response.json();
+            const rows = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+            // Mappa data för Chart.js
+            const timestamps = rows.map(d => d.timestamp);
+            const temps = rows.map(d => d.water_temperature);
+            const turbs = rows.map(d => d.turbidity);
+
+            // Om diagrammet inte har skapats än, skapa det
+            if (!historyChart) {
+                const ctx = document.getElementById('historyChart').getContext('2d');
+                historyChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timestamps,
+                        datasets: [
+                            {
+                                label: 'Temperatur (°C)',
+                                data: temps,
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Grumlighet (NTU)',
+                                data: turbs,
+                                borderColor: 'rgba(139, 69, 19, 1)',
+                                backgroundColor: 'rgba(139, 69, 19, 0.2)',
+                                tension: 0.4,
+                                fill: false,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'minute',
+                                    tooltipFormat: 'yyyy-MM-dd HH:mm:ss',
+                                    displayFormats: {
+                                        minute: 'HH:mm'
+                                    }
+                                },
+                                title: { display: true, text: 'Tid' }
+                            },
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: { display: true, text: 'Temperatur (°C)' }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: { display: true, text: 'Grumlighet (NTU)' },
+                                grid: { drawOnChartArea: false }
+                            }
+                        },
+                        animation: false
+                    }
+                });
+            } else {
+                // Annars, uppdatera bara dess data
+                historyChart.data.labels = timestamps;
+                historyChart.data.datasets[0].data = temps;
+                historyChart.data.datasets[1].data = turbs;
+                historyChart.update(); // Uppdatera diagrammet utan att rita om allt
+            }
+        }
+
+        // Funktion som körs vid varje intervall
+        async function updateDashboard() {
+            await fetchLatest();
+            // Uppdatera bara diagrammet automatiskt om vi är i Live-läge
+            if (isLiveMode) {
+                await updateHistoryChart();
+            }
+        }
+
+        // Kör en gång direkt vid laddning och sätt sedan upp en intervall
+        updateDashboard();
+        setInterval(updateDashboard, 30000);
+
+        // Sätt upp event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Helper för att sätta datum-inputs
+            const setLiveDateInputs = () => {
+                const now = new Date();
+                const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                
+                const format = (date) => {
+                    const pad = (n) => n < 10 ? '0' + n : n;
+                    return date.getFullYear() + '-' + 
+                           pad(date.getMonth() + 1) + '-' + 
+                           pad(date.getDate()) + 'T' + 
+                           pad(date.getHours()) + ':' + 
+                           pad(date.getMinutes());
+                };
+
+                document.getElementById('start-date').value = format(yesterday);
+                document.getElementById('end-date').value = format(now);
+            };
+
+            // Sätt initiala värden
+            setLiveDateInputs();
+
+            // Filter-knapp
+            document.getElementById('filter-btn').addEventListener('click', () => {
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+
+                if (startDate && endDate) {
+                    isLiveMode = false; // Stoppa autouppdatering av grafen
+                    updateHistoryChart(startDate, endDate);
+                } else {
+                    alert("Välj både start- och slutdatum.");
+                }
+            });
+
+            // Återställ/Live-knapp
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                isLiveMode = true;
+                setLiveDateInputs();
+                updateHistoryChart(); // Hämta senaste 24h
+            });
+        });
+    </script>
+{% endblock %}
