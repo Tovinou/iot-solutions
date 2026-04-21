@@ -22,7 +22,11 @@ db.sqlite3
 !doc/**/*.xlsx
 !doc/**/*.pdf
 
-doc/go-live-checklist.md
-doc/phase1-go-live-plan.md
-doc/phase2-hardening.md
-doc/phase3-enterprise-readiness.md
+smart-env-monitor/doc/*.docx
+smart-env-monitor/doc/*.pdf
+smart-env-monitor/doc/*.pptx
+smart-env-monitor/doc/*.txt
+smart-env-monitor/doc/go-live-checklist.md
+smart-env-monitor/doc/phase1-go-live-plan.md
+smart-env-monitor/doc/phase2-hardening.md
+smart-env-monitor/doc/phase3-enterprise-readiness.md
